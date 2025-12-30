@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const { z } = require("zod");
 
 const UserOtp = require("../../models/userAuthModel/userOtpModel");
+const User = require("../../models/userAuthModel/UserModel");
 const { sendOtpEmail } = require("../../utils/mailer");
 
 // ✅ strict validation
@@ -152,8 +153,16 @@ exports.verifyUserOtp = async (req, res) => {
     otpDoc.used = true;
     await otpDoc.save();
 
-    // ✅ Token payload (use your real User model later)
+    // ✅ Ensure persistent User exists and update last login
+    const user = await User.findOneAndUpdate(
+      { email },
+      { $set: { lastLoginAt: new Date() }, $setOnInsert: { email } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // ✅ Token payload includes user id
     const token = signToken({
+      userId: String(user._id),
       email,
       role: "user",
     });
@@ -164,8 +173,8 @@ exports.verifyUserOtp = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      token, // optional: if you want frontend localStorage. You can remove for stricter security.
-      user: { email, role: "user" },
+      token,
+      user: { id: user._id, email: user.email, role: "user" },
     });
   } catch (err) {
     console.error("verifyUserOtp error:", err);

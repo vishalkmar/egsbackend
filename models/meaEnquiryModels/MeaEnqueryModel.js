@@ -21,6 +21,7 @@ const TrackingSchema = new mongoose.Schema(
 
 const MeaEnquirySchema = new mongoose.Schema(
   {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: false },
     // form fields
     name: { type: String, default: "" },
     email: { type: String, required: true, trim: true, lowercase: true },

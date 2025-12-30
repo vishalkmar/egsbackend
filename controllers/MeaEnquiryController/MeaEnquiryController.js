@@ -45,8 +45,9 @@ const validatePayload = (body) => {
       return res.status(400).json({ message: "Validation failed", errors });
     }
 
-    // 1) Save in DB
+    // 1) Save in DB (attach userId when available)
     const doc = await MeaEnquiry.create({
+      userId: req.user?.id || null,
       name: req.body.name || "",
       email: req.body.email,
       contact: req.body.contact,
@@ -111,6 +112,23 @@ const validatePayload = (body) => {
  const getAllMeaEnquiries = async (req, res) => {
   try {
     const items = await MeaEnquiry.find().sort({ createdAt: -1 });
+    return res.json({ count: items.length, items });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
+  }
+};
+
+// GET /api/mea-attestation/enquiry/my  -> returns enquiries for logged-in user
+const getMyMeaEnquiries = async (req, res) => {
+  try {
+    console.log("[getMyMeaEnquiries] req.user:", req.user);
+    const userId = req.user?.id;
+    if (!userId) {
+      console.log("[getMyMeaEnquiries] No userId found, returning 401");
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const items = await MeaEnquiry.find({ userId }).sort({ createdAt: -1 });
     return res.json({ count: items.length, items });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
@@ -192,4 +210,5 @@ module.exports = {
   getMeaEnquiryById,
   deleteMeaEnquiryById,
   resendMeaEnquiryEmailsById,
+  getMyMeaEnquiries,
 };
