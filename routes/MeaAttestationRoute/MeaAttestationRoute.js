@@ -1,6 +1,6 @@
   
 const express = require('express')
-const { createMeaEnquiry,deleteMeaEnquiryById,getAllMeaEnquiries,getMeaEnquiryById,resendMeaEnquiryEmailsById,getMyMeaEnquiries } = require("../../controllers/MeaEnquiryController/MeaEnquiryController");
+const { createMeaEnquiry,deleteMeaEnquiryById,getAllMeaEnquiries,getMeaEnquiryById,resendMeaEnquiryEmailsById,getMyMeaEnquiries,updateMeaEnquiryById } = require("../../controllers/MeaEnquiryController/MeaEnquiryController");
 
 const router = express.Router();
 const { requireUser } = require("../../middleware/userAuth");
@@ -16,6 +16,9 @@ router.get("/mea-attestation/enquiry/my", requireUser, getMyMeaEnquiries);
 
 // get by id
 router.get("/mea-attestation/enquiry/:id", getMeaEnquiryById);
+
+// update status & payment by id
+router.patch("/mea-attestation/enquiry/:id", updateMeaEnquiryById);
 
 // delete by id
 router.delete("/mea-attestation/enquiry/:id", deleteMeaEnquiryById);

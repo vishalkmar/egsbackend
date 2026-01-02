@@ -1,6 +1,5 @@
-const MeaEnquiry = require("../../models/meaEnquiryModels/MeaEnqueryModel.js");
-
-const { buildAdminEmail,buildUserEmail} = require("../../utils/meaEmailService.js");
+const PccLegalization = require("../../models/pccLegalizationModels/PccLegalizationModel.js");
+const { buildAdminEmail, buildUserEmail } = require("../../utils/pccEmailService.js");
 
 const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
 
@@ -8,15 +7,12 @@ const validatePayload = (body) => {
   const errors = [];
 
   if (!isValidEmail(body.email)) errors.push("Invalid email");
-  if (!String(body.contact || "").trim()) errors.push("Contact is required");
+  if (!String(body.phone || "").trim()) errors.push("Phone is required");
   if (!String(body.country || "").trim()) errors.push("Country is required");
-  if (!String(body.docCategory || "").trim()) errors.push("docCategory is required");
-  if (!String(body.docType || "").trim()) errors.push("docType is required");
+  if (!String(body.companyName || "").trim()) errors.push("companyName is required");
 
   const n = Number(body.noOfDocuments);
   if (!n || n < 1) errors.push("noOfDocuments must be >= 1");
-
-  if (!body.enquiryDate) errors.push("enquiryDate is required");
 
   const submittedAt = body.submittedAt ? new Date(body.submittedAt) : null;
   if (!submittedAt || Number.isNaN(submittedAt.getTime())) errors.push("submittedAt must be valid ISO date");
@@ -35,8 +31,8 @@ const validatePayload = (body) => {
   return errors;
 };
 
-// POST /api/mea-attestation/enquiry
- const createMeaEnquiry = async (req, res) => {
+// POST /api/pcc-legalization/enquiry
+const createPccLegalization = async (req, res) => {
   console.log(req.body);
 
   try {
@@ -46,17 +42,15 @@ const validatePayload = (body) => {
     }
 
     // 1) Save in DB (attach userId when available)
-    const doc = await MeaEnquiry.create({
+    const doc = await PccLegalization.create({
       userId: req.user?.id || null,
       name: req.body.name || "",
       email: req.body.email,
-      contact: req.body.contact,
+      phone: req.body.phone,
       country: req.body.country,
-      docCategory: req.body.docCategory,
-      docType: req.body.docType,
+      companyName: req.body.companyName,
       noOfDocuments: Number(req.body.noOfDocuments),
       documents: req.body.documents || [],
-      enquiryDate: req.body.enquiryDate,
       submittedAt: new Date(req.body.submittedAt),
       tracking: req.body.tracking || {},
     });
@@ -68,7 +62,7 @@ const validatePayload = (body) => {
     // ✅ USER EMAIL
     try {
       const userMail = buildUserEmail(doc);
-      await userMail.send(); // 👈 send attached inside builder
+      await userMail.send();
       userSent = true;
     } catch (e) {
       console.error("User email failed:", e.message);
@@ -78,14 +72,14 @@ const validatePayload = (body) => {
     // ✅ ADMIN EMAIL
     try {
       const adminMail = buildAdminEmail(doc);
-      await adminMail.send(); // 👈 send attached inside builder
+      await adminMail.send();
       adminSent = true;
     } catch (e) {
       console.error("Admin email failed:", e.message);
       adminSent = false;
     }
 
-    // 3) Save email status (only if schema supports it)
+    // 3) Save email status
     if (doc.emails) {
       doc.emails.userSent = userSent;
       doc.emails.adminSent = adminSent;
@@ -99,7 +93,7 @@ const validatePayload = (body) => {
       emails: { userSent, adminSent },
     });
   } catch (err) {
-    console.error("Create MEA enquiry error:", err);
+    console.error("Create PCC enquiry error:", err);
     return res.status(500).json({
       message: "Server error",
       error: String(err?.message || err),
@@ -107,38 +101,37 @@ const validatePayload = (body) => {
   }
 };
 
-
-// GET /api/mea-attestation/enquiry
- const getAllMeaEnquiries = async (req, res) => {
+// GET /api/pcc-legalization/enquiry
+const getAllPccLegalizations = async (req, res) => {
   try {
-    const items = await MeaEnquiry.find().sort({ createdAt: -1 });
+    const items = await PccLegalization.find().sort({ createdAt: -1 });
     return res.json({ count: items.length, items });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
   }
 };
 
-// GET /api/mea-attestation/enquiry/my  -> returns enquiries for logged-in user
-const getMyMeaEnquiries = async (req, res) => {
+// GET /api/pcc-legalization/enquiry/my  -> returns enquiries for logged-in user
+const getMyPccLegalizations = async (req, res) => {
   try {
-    console.log("[getMyMeaEnquiries] req.user:", req.user);
+    console.log("[getMyPccLegalizations] req.user:", req.user);
     const userId = req.user?.id;
     if (!userId) {
-      console.log("[getMyMeaEnquiries] No userId found, returning 401");
+      console.log("[getMyPccLegalizations] No userId found, returning 401");
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const items = await MeaEnquiry.find({ userId }).sort({ createdAt: -1 });
+    const items = await PccLegalization.find({ userId }).sort({ createdAt: -1 });
     return res.json({ count: items.length, items });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
   }
 };
 
-// GET /api/mea-attestation/enquiry/:id
- const getMeaEnquiryById = async (req, res) => {
+// GET /api/pcc-legalization/enquiry/:id
+const getPccLegalizationById = async (req, res) => {
   try {
-    const item = await MeaEnquiry.findById(req.params.id);
+    const item = await PccLegalization.findById(req.params.id);
     if (!item) return res.status(404).json({ message: "Not found" });
     return res.json(item);
   } catch (err) {
@@ -146,10 +139,10 @@ const getMyMeaEnquiries = async (req, res) => {
   }
 };
 
-// DELETE /api/mea-attestation/enquiry/:id
- const deleteMeaEnquiryById = async (req, res) => {
+// DELETE /api/pcc-legalization/enquiry/:id
+const deletePccLegalizationById = async (req, res) => {
   try {
-    const deleted = await MeaEnquiry.findByIdAndDelete(req.params.id);
+    const deleted = await PccLegalization.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ message: "Not found" });
     return res.json({ message: "Deleted successfully", id: deleted._id });
   } catch (err) {
@@ -157,10 +150,10 @@ const getMyMeaEnquiries = async (req, res) => {
   }
 };
 
-// POST /api/mea-attestation/enquiry/:id/resend-email
- const resendMeaEnquiryEmailsById = async (req, res) => {
+// POST /api/pcc-legalization/enquiry/:id/resend-email
+const resendPccLegalizationEmailsById = async (req, res) => {
   try {
-    const item = await MeaEnquiry.findById(req.params.id);
+    const item = await PccLegalization.findById(req.params.id);
     if (!item) return res.status(404).json({ message: "Not found" });
 
     let userSent = false;
@@ -168,12 +161,7 @@ const getMyMeaEnquiries = async (req, res) => {
 
     try {
       const userMail = buildUserEmail(item);
-      await sendMail({
-        to: item.email,
-        subject: userMail.subject,
-        text: userMail.text,
-        html: userMail.html,
-      });
+      await userMail.send();
       userSent = true;
     } catch (e) {
       userSent = false;
@@ -181,12 +169,7 @@ const getMyMeaEnquiries = async (req, res) => {
 
     try {
       const adminMail = buildAdminEmail(item);
-      await sendMail({
-        to: getAdminEmail(),
-        subject: adminMail.subject,
-        text: adminMail.text,
-        html: adminMail.html,
-      });
+      await adminMail.send();
       adminSent = true;
     } catch (e) {
       adminSent = false;
@@ -203,9 +186,8 @@ const getMyMeaEnquiries = async (req, res) => {
   }
 };
 
-
-// PATCH /api/mea/mea-attestation/enquiry/:id -> update status & payment
-const updateMeaEnquiryById = async (req, res) => {
+// PATCH /api/pcc/pcc-legalization/enquiry/:id -> update status & payment
+const updatePccLegalizationById = async (req, res) => {
   try {
     const { status, payment } = req.body;
     const updates = {};
@@ -226,7 +208,7 @@ const updateMeaEnquiryById = async (req, res) => {
       updates.payment = payment;
     }
 
-    const updated = await MeaEnquiry.findByIdAndUpdate(req.params.id, updates, { new: true });
+    const updated = await PccLegalization.findByIdAndUpdate(req.params.id, updates, { new: true });
     if (!updated) return res.status(404).json({ message: "Not found" });
     return res.json({ message: "Updated successfully", item: updated });
   } catch (err) {
@@ -235,11 +217,11 @@ const updateMeaEnquiryById = async (req, res) => {
 };
 
 module.exports = {
-  createMeaEnquiry,
-  getAllMeaEnquiries,
-  getMeaEnquiryById,
-  deleteMeaEnquiryById,
-  resendMeaEnquiryEmailsById,
-  getMyMeaEnquiries,
-  updateMeaEnquiryById,
+  createPccLegalization,
+  getAllPccLegalizations,
+  getPccLegalizationById,
+  deletePccLegalizationById,
+  resendPccLegalizationEmailsById,
+  getMyPccLegalizations,
+  updatePccLegalizationById,
 };

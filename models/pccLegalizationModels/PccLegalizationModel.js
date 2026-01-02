@@ -19,23 +19,21 @@ const TrackingSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const MeaEnquirySchema = new mongoose.Schema(
+const PccLegalizationSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: false },
     // form fields
     name: { type: String, default: "" },
     email: { type: String, required: true, trim: true, lowercase: true },
-    contact: { type: String, required: true, trim: true },
+    phone: { type: String, required: true, trim: true },
     country: { type: String, required: true },
-    docCategory: { type: String, required: true },
-    docType: { type: String, required: true },
+    companyName: { type: String, required: true },
     noOfDocuments: { type: Number, required: true },
 
     // urls array
     documents: { type: [UploadedDocSchema], default: [] },
 
     // extra fields
-    enquiryDate: { type: String, required: true }, // yyyy-mm-dd
     submittedAt: { type: Date, required: true },
     tracking: { type: TrackingSchema, default: {} },
 
@@ -52,4 +50,5 @@ const MeaEnquirySchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-module.exports = mongoose.model("MeaEnquiry", MeaEnquirySchema);
+
+module.exports = mongoose.model('PccLegalization', PccLegalizationSchema);

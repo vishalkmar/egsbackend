@@ -6,5 +6,6 @@ router.use('/secureuser',require("./protecteduser"))
 router.use('/secureadmin',require('./protectedadmin'))
 router.use('/contact',require('./contactFormRoute/ContactRoutes'))
 router.use('/mea',require('../routes/MeaAttestationRoute/MeaAttestationRoute'))
+router.use('/pcc',require('../routes/PccLegalizationRoute/PccLegalizationRoute'))
 
 module.exports = router;
