@@ -10,5 +10,6 @@ router.use('/pcc',require('../routes/PccLegalizationRoute/PccLegalizationRoute')
 router.use('/translation', require('../routes/TranslationRoute/TranslationRoute'))
 router.use('/sticker', require('../routes/StickerVisaRoute/StickerVisaRoute'))
 router.use('/evisa', require('../routes/EVisaRoute/EVisaRoute'))
+router.use('/hrd', require('../routes/HrdAttestationRoute/HrdAttestationRoute'))
 
 module.exports = router;
