@@ -4,6 +4,7 @@ const UserSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     name: { type: String, default: '' },
+    phone: { type: String, default: '' },
     // add other profile fields as needed
     lastLoginAt: { type: Date, default: null },
   },

@@ -18,6 +18,8 @@ const sendOtpSchema = z.object({
       /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/,
       "Invalid email"
     ),
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name too long"),
+  phone: z.string().trim().min(10, "Phone must be at least 10 digits").max(15, "Phone too long"),
 });
 
 const verifyOtpSchema = z.object({
@@ -31,6 +33,8 @@ const verifyOtpSchema = z.object({
       "Invalid email"
     ),
   otp: z.string().regex(/^\d{6}$/, "OTP must be 6 digits"),
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name too long"),
+  phone: z.string().trim().min(10, "Phone must be at least 10 digits").max(15, "Phone too long"),
 });
 
 // Helpers
@@ -153,10 +157,17 @@ exports.verifyUserOtp = async (req, res) => {
     otpDoc.used = true;
     await otpDoc.save();
 
-    // ✅ Ensure persistent User exists and update last login
+    // ✅ Ensure persistent User exists and update with name/phone
     const user = await User.findOneAndUpdate(
       { email },
-      { $set: { lastLoginAt: new Date() }, $setOnInsert: { email } },
+      { 
+        $set: { 
+          lastLoginAt: new Date(),
+          name: parsed.data.name,
+          phone: parsed.data.phone
+        }, 
+        $setOnInsert: { email } 
+      },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
@@ -174,7 +185,7 @@ exports.verifyUserOtp = async (req, res) => {
       success: true,
       message: "Login successful",
       token,
-      user: { id: user._id, email: user.email, role: "user" },
+      user: { id: user._id, email: user.email, name: user.name, phone: user.phone, role: "user" },
     });
   } catch (err) {
     console.error("verifyUserOtp error:", err);
