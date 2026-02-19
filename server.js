@@ -16,10 +16,33 @@ const app = express();
 
 // ✅ Middlewares (for your installed packages)
 app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173",
-  credentials: true,
-}));
+
+const allowedOrigins = [
+  "https://egsglobalnew.vercel.app",
+  "http://localhost:5173",
+];
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // allow server-to-server / Postman / curl (no origin)
+      if (!origin) return cb(null, true);
+
+      // normalize trailing slash
+      const normalized = origin.replace(/\/$/, "");
+
+      if (allowedOrigins.includes(normalized)) return cb(null, true);
+
+      return cb(new Error("Not allowed by CORS: " + origin));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// preflight
+app.options("*", cors());
 
 app.use(cookieParser());
 app.use(bodyParser.json());
