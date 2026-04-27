@@ -1,36 +1,41 @@
-// src/server.js
 const express = require("express");
-const mongoose = require("mongoose"); // (optional here, but ok since you installed it)
 const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const helmet = require("helmet");
-const cookieParser = require('cookie-parser')
-
-const connectDB = require("./config/db");
+const cookieParser = require("cookie-parser");
 
 dotenv.config();
 
+const connectDB = require("./config/db");
 const routes = require("./routes");
+
 const app = express();
 
-// ✅ Middlewares (for your installed packages)
+const allowedOrigins = [
+  process.env.FRONTEND_ORIGIN?.trim(),
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+].filter(Boolean);
+
 app.use(helmet());
-
-
-
-app.use(cors({ origin: "*", credentials: false }));
-
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("CORS not allowed"));
+    },
+    credentials: true,
+  })
+);
 app.use(cookieParser());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 
-// ✅ Test API
-app.get("/api/test", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Backend is running fine!",
-  });
+app.get("/api/test", (_req, res) => {
+  res.status(200).json({ success: true, message: "Backend is running fine!" });
 });
 
 app.use("/api", routes);

@@ -1,38 +1,29 @@
-const Translation = require("../../models/translationModels/TranslationModel.js");
-
+const { Translation } = require("../../models");
 const { buildAdminEmail, buildUserEmail } = require("../../utils/translationEmailService.js");
+const {
+  createSubmission, listSubmissions, getSubmissionById,
+  updateSubmissionStatus, updateSubmissionFields, deleteSubmission, markEmailSent,
+} = require("../../utils/submissionService");
 
+const SUBMISSION_TYPE = "translation";
 const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || "").trim());
 
 const validatePayload = (body) => {
   const errors = [];
-
   if (!isValidEmail(body.email)) errors.push("Invalid email");
   if (!String(body.contact || "").trim()) errors.push("Contact is required");
-  // Accept either explicit language-based translation or the category-based form
   const hasLangFields = String(body.sourceLanguage || "").trim() && String(body.targetLanguage || "").trim();
   const hasCategoryFields = String(body.category || "").trim() && String(body.selectedDocType || "").trim();
-  if (!hasLangFields && !hasCategoryFields) errors.push("Either source/target languages and docType, or category and selectedDocType must be provided");
-
+  if (!hasLangFields && !hasCategoryFields) {
+    errors.push("Either source/target languages and docType, or category and selectedDocType must be provided");
+  }
   const n = Number(body.noOfDocuments);
   if (!n || n < 1) errors.push("noOfDocuments must be >= 1");
-
   if (!body.enquiryDate) errors.push("enquiryDate is required");
-
   const submittedAt = body.submittedAt ? new Date(body.submittedAt) : null;
   if (!submittedAt || Number.isNaN(submittedAt.getTime())) errors.push("submittedAt must be valid ISO date");
-
   const docs = Array.isArray(body.documents) ? body.documents : [];
   if (docs.length !== n) errors.push("documents count must match noOfDocuments");
-
-  for (const d of docs) {
-    if (!d?.url) errors.push("Each document must have url");
-    if (!d?.originalName) errors.push("Each document must have originalName");
-    if (!d?.mimeType) errors.push("Each document must have mimeType");
-    if (typeof d?.size !== "number") errors.push("Each document must have size (number)");
-    if (typeof d?.index !== "number") errors.push("Each document must have index (number)");
-  }
-
   return errors;
 };
 
@@ -41,7 +32,7 @@ const createTranslation = async (req, res) => {
     const errors = validatePayload(req.body);
     if (errors.length) return res.status(400).json({ message: "Validation failed", errors });
 
-    const doc = await Translation.create({
+    const payload = {
       userId: req.user?.id || null,
       name: req.body.name || "",
       email: req.body.email,
@@ -53,41 +44,25 @@ const createTranslation = async (req, res) => {
       docType: req.body.selectedDocType || req.body.docType || null,
       country: req.body.country || null,
       noOfDocuments: Number(req.body.noOfDocuments),
-      documents: req.body.documents || [],
       enquiryDate: req.body.enquiryDate,
       submittedAt: new Date(req.body.submittedAt),
       tracking: req.body.tracking || {},
+    };
+
+    const submission = await createSubmission({
+      Model: Translation, submissionType: SUBMISSION_TYPE, payload,
+      documentsInput: req.body.documents,
+      actor: { role: req.user ? "user" : "system", email: req.body.email },
     });
+    const hydrated = await getSubmissionById({ Model: Translation, id: submission.id });
 
-    let userSent = false;
-    let adminSent = false;
+    let userSent = false, adminSent = false;
+    try { await buildUserEmail(hydrated).send(); userSent = true; await markEmailSent({ submission: hydrated, kind: "user" }); }
+    catch (e) { console.error("Translation user email failed:", e.message); }
+    try { await buildAdminEmail(hydrated).send(); adminSent = true; await markEmailSent({ submission: hydrated, kind: "admin" }); }
+    catch (e) { console.error("Translation admin email failed:", e.message); }
 
-    try {
-      const userMail = buildUserEmail(doc);
-      await userMail.send();
-      userSent = true;
-    } catch (e) {
-      console.error("User email failed:", e.message);
-      userSent = false;
-    }
-
-    try {
-      const adminMail = buildAdminEmail(doc);
-      await adminMail.send();
-      adminSent = true;
-    } catch (e) {
-      console.error("Admin email failed:", e.message);
-      adminSent = false;
-    }
-
-    if (doc.emails) {
-      doc.emails.userSent = userSent;
-      doc.emails.adminSent = adminSent;
-      doc.emails.lastEmailAt = new Date();
-      await doc.save();
-    }
-
-    return res.status(201).json({ message: "Enquiry stored successfully", id: doc._id, emails: { userSent, adminSent } });
+    return res.status(201).json({ message: "Enquiry stored successfully", id: hydrated.id, item: hydrated, emails: { userSent, adminSent } });
   } catch (err) {
     console.error("Create Translation enquiry error:", err);
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
@@ -96,8 +71,11 @@ const createTranslation = async (req, res) => {
 
 const getAllTranslations = async (req, res) => {
   try {
-    const items = await Translation.find().sort({ createdAt: -1 });
-    return res.json({ count: items.length, items });
+    const result = await listSubmissions({
+      Model: Translation, req, includeDocs: true,
+      searchFields: ["email", "name", "contact", "source_language", "target_language", "category"],
+    });
+    return res.json({ count: result.pagination.total, ...result });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
   }
@@ -105,11 +83,12 @@ const getAllTranslations = async (req, res) => {
 
 const getMyTranslations = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
-    const items = await Translation.find({ userId }).sort({ createdAt: -1 });
-    return res.json({ count: items.length, items });
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+    const result = await listSubmissions({
+      Model: Translation, req, userId: req.user.id, includeDocs: true,
+      searchFields: ["email", "name"],
+    });
+    return res.json({ count: result.pagination.total, ...result });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
   }
@@ -117,7 +96,7 @@ const getMyTranslations = async (req, res) => {
 
 const getTranslationById = async (req, res) => {
   try {
-    const item = await Translation.findById(req.params.id);
+    const item = await getSubmissionById({ Model: Translation, id: req.params.id, withHistory: true });
     if (!item) return res.status(404).json({ message: "Not found" });
     return res.json(item);
   } catch (err) {
@@ -127,9 +106,9 @@ const getTranslationById = async (req, res) => {
 
 const deleteTranslationById = async (req, res) => {
   try {
-    const deleted = await Translation.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: "Not found" });
-    return res.json({ message: "Deleted successfully", id: deleted._id });
+    const ok = await deleteSubmission({ Model: Translation, submissionType: SUBMISSION_TYPE, id: req.params.id });
+    if (!ok) return res.status(404).json({ message: "Not found" });
+    return res.json({ message: "Deleted successfully", id: req.params.id });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
   }
@@ -137,33 +116,11 @@ const deleteTranslationById = async (req, res) => {
 
 const resendTranslationEmailsById = async (req, res) => {
   try {
-    const item = await Translation.findById(req.params.id);
+    const item = await getSubmissionById({ Model: Translation, id: req.params.id });
     if (!item) return res.status(404).json({ message: "Not found" });
-
-    let userSent = false;
-    let adminSent = false;
-
-    try {
-      const userMail = buildUserEmail(item);
-      await userMail.send();
-      userSent = true;
-    } catch (e) {
-      userSent = false;
-    }
-
-    try {
-      const adminMail = buildAdminEmail(item);
-      await adminMail.send();
-      adminSent = true;
-    } catch (e) {
-      adminSent = false;
-    }
-
-    item.emails.userSent = userSent;
-    item.emails.adminSent = adminSent;
-    item.emails.lastEmailAt = new Date();
-    await item.save();
-
+    let userSent = false, adminSent = false;
+    try { await buildUserEmail(item).send(); userSent = true; await markEmailSent({ submission: item, kind: "user" }); } catch (e) {}
+    try { await buildAdminEmail(item).send(); adminSent = true; await markEmailSent({ submission: item, kind: "admin" }); } catch (e) {}
     return res.json({ message: "Emails attempted", emails: { userSent, adminSent } });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
@@ -172,35 +129,31 @@ const resendTranslationEmailsById = async (req, res) => {
 
 const updateTranslationById = async (req, res) => {
   try {
-    const { status, payment } = req.body;
-    const updates = {};
-
-    if (status) {
-      const validStatuses = ['Pending', 'Approved', 'Rejected', 'Dispatched', 'Received'];
-      if (!validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status" });
-      updates.status = status;
+    const updates = req.body || {};
+    if (updates.status) {
+      try {
+        const updated = await updateSubmissionStatus({
+          Model: Translation, submissionType: SUBMISSION_TYPE,
+          id: req.params.id, newStatus: updates.status, note: updates.note,
+          actor: { role: req.admin ? "admin" : "user", email: req.admin?.email || req.user?.email },
+        });
+        if (!updated) return res.status(404).json({ message: "Not found" });
+      } catch (e) {
+        if (e.code === "INVALID_STATUS") return res.status(400).json({ message: e.message });
+        throw e;
+      }
     }
-
-    if (payment) {
-      const validPayments = ['Paid', 'Pending'];
-      if (!validPayments.includes(payment)) return res.status(400).json({ message: "Invalid payment status" });
-      updates.payment = payment;
-    }
-
-    const updated = await Translation.findByIdAndUpdate(req.params.id, updates, { new: true });
+    const updated = await updateSubmissionFields({ Model: Translation, id: req.params.id, updates });
     if (!updated) return res.status(404).json({ message: "Not found" });
-    return res.json({ message: "Updated successfully", item: updated });
+    const hydrated = await getSubmissionById({ Model: Translation, id: req.params.id, withHistory: true });
+    return res.json({ message: "Updated successfully", item: hydrated });
   } catch (err) {
     return res.status(500).json({ message: "Server error", error: String(err?.message || err) });
   }
 };
 
 module.exports = {
-  createTranslation,
-  getAllTranslations,
-  getTranslationById,
-  deleteTranslationById,
-  resendTranslationEmailsById,
-  getMyTranslations,
-  updateTranslationById,
+  createTranslation, getAllTranslations, getTranslationById,
+  deleteTranslationById, resendTranslationEmailsById,
+  getMyTranslations, updateTranslationById,
 };

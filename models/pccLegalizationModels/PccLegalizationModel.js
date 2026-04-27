@@ -1,54 +1,53 @@
-const mongoose = require('mongoose')
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../../config/db");
 
-const UploadedDocSchema = new mongoose.Schema(
+const STATUSES = ["Pending", "Approved", "Rejected", "Processing", "Dispatched", "Received"];
+const PAYMENTS = ["Paid", "Pending"];
+
+const PccLegalization = sequelize.define(
+  "PccLegalization",
   {
-    index: { type: Number, required: true },
-    originalName: { type: String, required: true },
-    mimeType: { type: String, required: true },
-    size: { type: Number, required: true },
-    url: { type: String, required: true },
-  },
-  { _id: false }
-);
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    userId: { type: DataTypes.UUID, allowNull: true },
 
-const TrackingSchema = new mongoose.Schema(
-  {
-    pageUrl: { type: String, default: "" },
-    userAgent: { type: String, default: "" },
-  },
-  { _id: false }
-);
+    name: { type: DataTypes.STRING(150), allowNull: false, defaultValue: "" },
+    email: {
+      type: DataTypes.STRING(120),
+      allowNull: false,
+      set(val) { this.setDataValue("email", String(val || "").trim().toLowerCase()); },
+    },
+    phone: { type: DataTypes.STRING(30), allowNull: false },
+    country: { type: DataTypes.STRING(120), allowNull: false },
+    companyName: { type: DataTypes.STRING(200), allowNull: false },
+    noOfDocuments: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 
-const PccLegalizationSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: false },
-    // form fields
-    name: { type: String, default: "" },
-    email: { type: String, required: true, trim: true, lowercase: true },
-    phone: { type: String, required: true, trim: true },
-    country: { type: String, required: true },
-    companyName: { type: String, required: true },
-    noOfDocuments: { type: Number, required: true },
+    submittedAt: { type: DataTypes.DATE, allowNull: false },
+    enquiryDate: { type: DataTypes.STRING(20), allowNull: true },
 
-    // urls array
-    documents: { type: [UploadedDocSchema], default: [] },
-
-    // extra fields
-    submittedAt: { type: Date, required: true },
-    tracking: { type: TrackingSchema, default: {} },
-
-    // email tracking
+    tracking: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
     emails: {
-      userSent: { type: Boolean, default: false },
-      adminSent: { type: Boolean, default: false },
-      lastEmailAt: { type: Date, default: null },
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: { userSent: false, adminSent: false, lastEmailAt: null },
     },
 
-    // status & payment
-    status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Dispatched', 'Received'], default: 'Pending' },
-    payment: { type: String, enum: ['Paid', 'Pending'], default: 'Pending' },
+    status: { type: DataTypes.ENUM(...STATUSES), allowNull: false, defaultValue: "Pending" },
+    payment: { type: DataTypes.ENUM(...PAYMENTS), allowNull: false, defaultValue: "Pending" },
   },
-  { timestamps: true }
+  {
+    tableName: "pcc_submissions",
+    timestamps: true,
+    indexes: [
+      { fields: ["user_id"] },
+      { fields: ["email"] },
+      { fields: ["status"] },
+      { fields: ["created_at"] },
+    ],
+  }
 );
 
-module.exports = mongoose.model('PccLegalization', PccLegalizationSchema);
+PccLegalization.SUBMISSION_TYPE = "pcc";
+PccLegalization.STATUSES = STATUSES;
+PccLegalization.PAYMENTS = PAYMENTS;
+
+module.exports = PccLegalization;

@@ -11,5 +11,8 @@ router.use('/translation', require('../routes/TranslationRoute/TranslationRoute'
 router.use('/sticker', require('../routes/StickerVisaRoute/StickerVisaRoute'))
 router.use('/evisa', require('../routes/EVisaRoute/EVisaRoute'))
 router.use('/hrd', require('../routes/HrdAttestationRoute/HrdAttestationRoute'))
+router.use('/assistant', require('../routes/AssistantAppointmentRoute/AssistantAppointmentRoute'))
+router.use('/insurance', require('../routes/InsuranceRoute/InsuranceRoute'))
+router.use('/meet-greet', require('../routes/MeetGreetRoute/MeetGreetRoute'))
 
 module.exports = router;

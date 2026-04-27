@@ -1,46 +1,56 @@
-const EVisa = require("../../models/eVisaModels/EVisaModel.js");
+const { EVisa } = require("../../models");
 const { buildAdminEmail, buildUserEmail } = require("../../utils/eVisaEmailService.js");
+const {
+  createSubmission,
+  listSubmissions,
+  getSubmissionById,
+  updateSubmissionStatus,
+  updateSubmissionFields,
+  deleteSubmission,
+  markEmailSent,
+} = require("../../utils/submissionService");
+
+const SUBMISSION_TYPE = "evisa";
 
 const createEVisa = async (req, res) => {
   try {
-    const data = req.body;
+    const data = req.body || {};
+    if (!data.email || !data.contact || !data.visaType) {
+      return res.status(400).json({ success: false, message: "Email, contact and visaType are required" });
+    }
 
-    const doc = await EVisa.create({
+    const payload = {
       userId: req.user?.id || null,
       name: data.name || "",
       email: data.email,
       contact: data.contact,
-      country: data.country || "",
+      country: data.country || null,
       visaType: data.visaType,
       noOfDays: data.noOfDays || 0,
-      documents: data.documents || [],
       enquiryDate: data.enquiryDate || new Date().toISOString().split("T")[0],
       submittedAt: data.submittedAt ? new Date(data.submittedAt) : new Date(),
       tracking: data.tracking || {},
+    };
+
+    const submission = await createSubmission({
+      Model: EVisa, submissionType: SUBMISSION_TYPE, payload,
+      documentsInput: data.documents,
+      actor: { role: req.user ? "user" : "system", email: data.email },
     });
 
-    // Attempt to send emails
-    const userEmail = buildUserEmail(doc);
+    const hydrated = await getSubmissionById({ Model: EVisa, id: submission.id });
+
     try {
-      await userEmail.send();
-      doc.emails.userSent = true;
-      doc.emails.lastEmailAt = new Date();
-    } catch (e) {
-      console.error("E-Visa: user email send failed", e.message || e);
-    }
+      await buildUserEmail(hydrated).send();
+      await markEmailSent({ submission: hydrated, kind: "user" });
+    } catch (e) { console.error("E-Visa: user email send failed", e?.message || e); }
 
-    const adminEmail = buildAdminEmail(doc);
     try {
-      await adminEmail.send();
-      doc.emails.adminSent = true;
-      doc.emails.lastEmailAt = new Date();
-    } catch (e) {
-      console.error("E-Visa: admin email send failed", e.message || e);
-    }
+      await buildAdminEmail(hydrated).send();
+      await markEmailSent({ submission: hydrated, kind: "admin" });
+    } catch (e) { console.error("E-Visa: admin email send failed", e?.message || e); }
 
-    await doc.save();
-
-    return res.json({ success: true, item: doc, message: "E-Visa enquiry received" });
+    return res.json({ success: true, item: hydrated, message: "E-Visa enquiry received" });
   } catch (err) {
     console.error("Create E-Visa enquiry error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -49,8 +59,11 @@ const createEVisa = async (req, res) => {
 
 const getAllEVisas = async (req, res) => {
   try {
-    const items = await EVisa.find().sort({ createdAt: -1 });
-    return res.json({ success: true, items });
+    const result = await listSubmissions({
+      Model: EVisa, req, includeDocs: true,
+      searchFields: ["email", "name", "contact", "visa_type", "country"],
+    });
+    return res.json({ success: true, ...result });
   } catch (err) {
     console.error("Get all E-Visa error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -59,9 +72,11 @@ const getAllEVisas = async (req, res) => {
 
 const getMyEVisas = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    const items = await EVisa.find({ userId }).sort({ createdAt: -1 });
-    return res.json({ success: true, items });
+    const result = await listSubmissions({
+      Model: EVisa, req, userId: req.user?.id, includeDocs: true,
+      searchFields: ["email", "name"],
+    });
+    return res.json({ success: true, ...result });
   } catch (err) {
     console.error("Get my E-Visa error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -70,7 +85,7 @@ const getMyEVisas = async (req, res) => {
 
 const getEVisaById = async (req, res) => {
   try {
-    const item = await EVisa.findById(req.params.id);
+    const item = await getSubmissionById({ Model: EVisa, id: req.params.id, withHistory: true });
     if (!item) return res.status(404).json({ success: false, message: "Not found" });
     return res.json({ success: true, item });
   } catch (err) {
@@ -81,8 +96,8 @@ const getEVisaById = async (req, res) => {
 
 const deleteEVisaById = async (req, res) => {
   try {
-    const deleted = await EVisa.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ success: false, message: "Not found" });
+    const ok = await deleteSubmission({ Model: EVisa, submissionType: SUBMISSION_TYPE, id: req.params.id });
+    if (!ok) return res.status(404).json({ success: false, message: "Not found" });
     return res.json({ success: true, message: "Deleted" });
   } catch (err) {
     console.error("Delete E-Visa by id error:", err);
@@ -92,28 +107,17 @@ const deleteEVisaById = async (req, res) => {
 
 const resendEVisaEmailsById = async (req, res) => {
   try {
-    const item = await EVisa.findById(req.params.id);
+    const item = await getSubmissionById({ Model: EVisa, id: req.params.id });
     if (!item) return res.status(404).json({ success: false, message: "Not found" });
 
-    const userEmail = buildUserEmail(item);
-    const adminEmail = buildAdminEmail(item);
     try {
-      await userEmail.send();
-      item.emails.userSent = true;
-      item.emails.lastEmailAt = new Date();
-    } catch (e) {
-      console.error("Resend E-Visa: user email failed", e.message || e);
-    }
-
+      await buildUserEmail(item).send();
+      await markEmailSent({ submission: item, kind: "user" });
+    } catch (e) { console.error("Resend E-Visa: user email failed", e?.message || e); }
     try {
-      await adminEmail.send();
-      item.emails.adminSent = true;
-      item.emails.lastEmailAt = new Date();
-    } catch (e) {
-      console.error("Resend E-Visa: admin email failed", e.message || e);
-    }
-
-    await item.save();
+      await buildAdminEmail(item).send();
+      await markEmailSent({ submission: item, kind: "admin" });
+    } catch (e) { console.error("Resend E-Visa: admin email failed", e?.message || e); }
 
     return res.json({ success: true, item, message: "Emails resent" });
   } catch (err) {
@@ -125,9 +129,23 @@ const resendEVisaEmailsById = async (req, res) => {
 const updateEVisaById = async (req, res) => {
   try {
     const updates = req.body || {};
-    const updated = await EVisa.findByIdAndUpdate(req.params.id, updates, { new: true });
+    if (updates.status) {
+      try {
+        const updated = await updateSubmissionStatus({
+          Model: EVisa, submissionType: SUBMISSION_TYPE,
+          id: req.params.id, newStatus: updates.status, note: updates.note,
+          actor: { role: req.admin ? "admin" : "user", email: req.admin?.email || req.user?.email },
+        });
+        if (!updated) return res.status(404).json({ success: false, message: "Not found" });
+      } catch (e) {
+        if (e.code === "INVALID_STATUS") return res.status(400).json({ success: false, message: e.message });
+        throw e;
+      }
+    }
+    const updated = await updateSubmissionFields({ Model: EVisa, id: req.params.id, updates });
     if (!updated) return res.status(404).json({ success: false, message: "Not found" });
-    return res.json({ success: true, item: updated });
+    const hydrated = await getSubmissionById({ Model: EVisa, id: req.params.id, withHistory: true });
+    return res.json({ success: true, item: hydrated });
   } catch (err) {
     console.error("Update E-Visa error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -135,11 +153,6 @@ const updateEVisaById = async (req, res) => {
 };
 
 module.exports = {
-  createEVisa,
-  getAllEVisas,
-  getEVisaById,
-  deleteEVisaById,
-  resendEVisaEmailsById,
-  getMyEVisas,
-  updateEVisaById,
+  createEVisa, getAllEVisas, getEVisaById, deleteEVisaById,
+  resendEVisaEmailsById, getMyEVisas, updateEVisaById,
 };

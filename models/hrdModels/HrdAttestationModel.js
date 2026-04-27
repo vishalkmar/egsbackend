@@ -1,57 +1,63 @@
-const mongoose = require('mongoose')
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../../config/db");
 
-const UploadedDocSchema = new mongoose.Schema(
+const STATUSES = ["Pending", "Approved", "Rejected", "Processing", "Dispatched", "Received"];
+const PAYMENTS = ["Paid", "Pending"];
+
+const Hrd = sequelize.define(
+  "Hrd",
   {
-    index: { type: Number, required: true },
-    originalName: { type: String, required: true },
-    mimeType: { type: String, required: true },
-    size: { type: Number, required: true },
-    url: { type: String, required: true },
-  },
-  { _id: false }
-);
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    userId: { type: DataTypes.UUID, allowNull: true },
 
-const TrackingSchema = new mongoose.Schema(
-  {
-    pageUrl: { type: String, default: "" },
-    userAgent: { type: String, default: "" },
-  },
-  { _id: false }
-);
+    firstName: { type: DataTypes.STRING(100), allowNull: false, defaultValue: "" },
+    lastName: { type: DataTypes.STRING(100), allowNull: false, defaultValue: "" },
+    email: {
+      type: DataTypes.STRING(120),
+      allowNull: false,
+      set(val) { this.setDataValue("email", String(val || "").trim().toLowerCase()); },
+    },
+    mobile: { type: DataTypes.STRING(30), allowNull: false },
 
-const HrdSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: false },
+    state: { type: DataTypes.STRING(100), allowNull: false, defaultValue: "" },
+    district: { type: DataTypes.STRING(100), allowNull: false, defaultValue: "" },
+    docType: { type: DataTypes.STRING(120), allowNull: false, defaultValue: "" },
+    selectedDocs: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      allowNull: false,
+      defaultValue: [],
+    },
+    docCount: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 
-    firstName: { type: String, default: "" },
-    lastName: { type: String, default: "" },
-    email: { type: String, required: true, trim: true, lowercase: true },
-    mobile: { type: String, required: true, trim: true },
+    message: { type: DataTypes.TEXT, allowNull: false, defaultValue: "" },
 
-    state: { type: String, default: "" },
-    district: { type: String, default: "" },
-    docType: { type: String, default: "" },
-    selectedDocs: { type: [String], default: [] },
-    docCount: { type: Number, default: 0 },
+    enquiryDate: { type: DataTypes.STRING(20), allowNull: false },
+    submittedAt: { type: DataTypes.DATE, allowNull: false },
 
-    message: { type: String, default: "" },
-
-    documents: { type: [UploadedDocSchema], default: [] },
-
-    enquiryDate: { type: String, required: true },
-    submittedAt: { type: Date, required: true },
-    tracking: { type: TrackingSchema, default: {} },
-
+    tracking: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
     emails: {
-      userSent: { type: Boolean, default: false },
-      adminSent: { type: Boolean, default: false },
-      lastEmailAt: { type: Date, default: null },
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: { userSent: false, adminSent: false, lastEmailAt: null },
     },
 
-    status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Dispatched', 'Received'], default: 'Pending' },
-    payment: { type: String, enum: ['Paid', 'Pending'], default: 'Pending' },
+    status: { type: DataTypes.ENUM(...STATUSES), allowNull: false, defaultValue: "Pending" },
+    payment: { type: DataTypes.ENUM(...PAYMENTS), allowNull: false, defaultValue: "Pending" },
   },
-  { timestamps: true }
+  {
+    tableName: "hrd_submissions",
+    timestamps: true,
+    indexes: [
+      { fields: ["user_id"] },
+      { fields: ["email"] },
+      { fields: ["status"] },
+      { fields: ["created_at"] },
+    ],
+  }
 );
 
-module.exports = mongoose.model('HrdAttestation', HrdSchema);
+Hrd.SUBMISSION_TYPE = "hrd";
+Hrd.STATUSES = STATUSES;
+Hrd.PAYMENTS = PAYMENTS;
+
+module.exports = Hrd;

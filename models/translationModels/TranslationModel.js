@@ -1,55 +1,58 @@
-const mongoose = require('mongoose')
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../../config/db");
 
-const UploadedDocSchema = new mongoose.Schema(
+const STATUSES = ["Pending", "Approved", "Rejected", "Processing", "Dispatched", "Received"];
+const PAYMENTS = ["Paid", "Pending"];
+
+const Translation = sequelize.define(
+  "Translation",
   {
-    index: { type: Number, required: true },
-    originalName: { type: String, required: true },
-    mimeType: { type: String, required: true },
-    size: { type: Number, required: true },
-    url: { type: String, required: true },
-  },
-  { _id: false }
-);
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    userId: { type: DataTypes.UUID, allowNull: true },
 
-const TrackingSchema = new mongoose.Schema(
-  {
-    pageUrl: { type: String, default: "" },
-    userAgent: { type: String, default: "" },
-  },
-  { _id: false }
-);
+    name: { type: DataTypes.STRING(150), allowNull: false, defaultValue: "" },
+    email: {
+      type: DataTypes.STRING(120),
+      allowNull: false,
+      set(val) { this.setDataValue("email", String(val || "").trim().toLowerCase()); },
+    },
+    contact: { type: DataTypes.STRING(30), allowNull: false },
 
-const TranslationSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: false },
-    name: { type: String, default: "" },
-    email: { type: String, required: true, trim: true, lowercase: true },
-    contact: { type: String, required: true, trim: true },
-    // flexible fields to support frontend form
-    sourceLanguage: { type: String, required: false },
-    targetLanguage: { type: String, required: false },
-    category: { type: String, required: false },
-    selectedDocType: { type: String, required: false },
-    docType: { type: String, required: false },
-    country: { type: String, required: false },
-    noOfDocuments: { type: Number, required: true },
+    sourceLanguage: { type: DataTypes.STRING(80), allowNull: true },
+    targetLanguage: { type: DataTypes.STRING(80), allowNull: true },
+    category: { type: DataTypes.STRING(120), allowNull: true },
+    selectedDocType: { type: DataTypes.STRING(120), allowNull: true },
+    docType: { type: DataTypes.STRING(120), allowNull: true },
+    country: { type: DataTypes.STRING(120), allowNull: true },
+    noOfDocuments: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 
-    documents: { type: [UploadedDocSchema], default: [] },
+    enquiryDate: { type: DataTypes.STRING(20), allowNull: false },
+    submittedAt: { type: DataTypes.DATE, allowNull: false },
 
-    enquiryDate: { type: String, required: true },
-    submittedAt: { type: Date, required: true },
-    tracking: { type: TrackingSchema, default: {} },
-
+    tracking: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
     emails: {
-      userSent: { type: Boolean, default: false },
-      adminSent: { type: Boolean, default: false },
-      lastEmailAt: { type: Date, default: null },
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: { userSent: false, adminSent: false, lastEmailAt: null },
     },
 
-    status: { type: String, enum: ['Pending', 'Approved', 'Rejected', 'Dispatched', 'Received'], default: 'Pending' },
-    payment: { type: String, enum: ['Paid', 'Pending'], default: 'Pending' },
+    status: { type: DataTypes.ENUM(...STATUSES), allowNull: false, defaultValue: "Pending" },
+    payment: { type: DataTypes.ENUM(...PAYMENTS), allowNull: false, defaultValue: "Pending" },
   },
-  { timestamps: true }
+  {
+    tableName: "translation_submissions",
+    timestamps: true,
+    indexes: [
+      { fields: ["user_id"] },
+      { fields: ["email"] },
+      { fields: ["status"] },
+      { fields: ["created_at"] },
+    ],
+  }
 );
 
-module.exports = mongoose.model('Translation', TranslationSchema);
+Translation.SUBMISSION_TYPE = "translation";
+Translation.STATUSES = STATUSES;
+Translation.PAYMENTS = PAYMENTS;
+
+module.exports = Translation;
