@@ -23,7 +23,7 @@ const Hrd = sequelize.define(
     district: { type: DataTypes.STRING(100), allowNull: false, defaultValue: "" },
     docType: { type: DataTypes.STRING(120), allowNull: false, defaultValue: "" },
     selectedDocs: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
+      type: DataTypes.JSON,
       allowNull: false,
       defaultValue: [],
     },
@@ -34,9 +34,9 @@ const Hrd = sequelize.define(
     enquiryDate: { type: DataTypes.STRING(20), allowNull: false },
     submittedAt: { type: DataTypes.DATE, allowNull: false },
 
-    tracking: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+    tracking: { type: DataTypes.JSON, allowNull: false, defaultValue: {} },
     emails: {
-      type: DataTypes.JSONB,
+      type: DataTypes.JSON,
       allowNull: false,
       defaultValue: { userSent: false, adminSent: false, lastEmailAt: null },
     },

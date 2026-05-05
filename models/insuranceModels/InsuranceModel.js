@@ -24,9 +24,9 @@ const Insurance = sequelize.define(
     specialRequirements: { type: DataTypes.TEXT, allowNull: true },
     enquiryDate: { type: DataTypes.STRING(20), allowNull: false },
     submittedAt: { type: DataTypes.DATE, allowNull: false },
-    tracking: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+    tracking: { type: DataTypes.JSON, allowNull: false, defaultValue: {} },
     emails: {
-      type: DataTypes.JSONB,
+      type: DataTypes.JSON,
       allowNull: false,
       defaultValue: { userSent: false, adminSent: false, lastEmailAt: null },
     },

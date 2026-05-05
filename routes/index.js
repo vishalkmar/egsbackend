@@ -14,5 +14,8 @@ router.use('/hrd', require('../routes/HrdAttestationRoute/HrdAttestationRoute'))
 router.use('/assistant', require('../routes/AssistantAppointmentRoute/AssistantAppointmentRoute'))
 router.use('/insurance', require('../routes/InsuranceRoute/InsuranceRoute'))
 router.use('/meet-greet', require('../routes/MeetGreetRoute/MeetGreetRoute'))
+router.use('/dummy-ticket', require('../routes/DummyTicketRoute/DummyTicketRoute'))
+router.use('/courier', require('../routes/CourierRoute/CourierRoute'))
+router.use('/payments', require('../routes/PaymentRoute/PaymentRoute'))
 
 module.exports = router;

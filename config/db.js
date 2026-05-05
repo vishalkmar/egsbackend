@@ -1,13 +1,16 @@
 const { Sequelize } = require("sequelize");
 
+const dialect = process.env.DB_DIALECT || "mysql";
+const defaultPort = dialect === "mysql" ? 3306 : 5432;
+
 const sequelize = new Sequelize(
-  process.env.DATABASE_NAME || "egs_global",
-  process.env.DATABASE_USER || "postgres",
+  process.env.DATABASE_NAME || "iccictor_egs",
+  process.env.DATABASE_USER || "iccictor_egs",
   process.env.DATABASE_PASSWORD || "",
   {
     host: process.env.DATABASE_HOST || "127.0.0.1",
-    port: Number(process.env.DATABASE_PORT || 5432),
-    dialect: "postgres",
+    port: Number(process.env.DATABASE_PORT || defaultPort),
+    dialect,
     logging: false,
     define: {
       underscored: true,
@@ -22,48 +25,10 @@ const sequelize = new Sequelize(
   }
 );
 
-async function ensureEnumValues(typeName, values) {
-  const [rows] = await sequelize.query(
-    `
-      SELECT EXISTS (
-        SELECT 1
-        FROM pg_type
-        WHERE typname = :typeName
-      ) AS "exists";
-    `,
-    { replacements: { typeName } }
-  );
-
-  if (!rows?.[0]?.exists) return;
-
-  for (const value of values) {
-    await sequelize.query(
-      `ALTER TYPE "${typeName}" ADD VALUE IF NOT EXISTS '${value}';`
-    );
-  }
-}
-
-async function ensureSubmissionEnums() {
-  const submissionTypes = [
-    "evisa",
-    "hrd",
-    "mea",
-    "pcc",
-    "sticker_visa",
-    "translation",
-    "assistant_appointment",
-    "insurance",
-    "meet_greet",
-  ];
-
-  await ensureEnumValues("enum_status_history_submission_type", submissionTypes);
-  await ensureEnumValues("enum_documents_submission_type", submissionTypes);
-}
-
 const connectDB = async () => {
   try {
     await sequelize.authenticate();
-    console.log(`PostgreSQL connected: ${process.env.DATABASE_HOST}:${process.env.DATABASE_PORT}/${process.env.DATABASE_NAME}`);
+    console.log(`${dialect.toUpperCase()} connected: ${process.env.DATABASE_HOST}:${process.env.DATABASE_PORT}/${process.env.DATABASE_NAME}`);
 
     const { initModels } = require("../models");
     initModels();
@@ -79,11 +44,8 @@ const connectDB = async () => {
       await sequelize.sync();
       console.log("DB synced (safe)");
     }
-
-    await ensureSubmissionEnums();
-    console.log("Submission enums verified");
   } catch (err) {
-    console.error("Postgres connection error:", err.message);
+    console.error(`${dialect.toUpperCase()} connection error:`, err.message);
     process.exit(1);
   }
 };

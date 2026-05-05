@@ -11,6 +11,9 @@ const Translation = require("./translationModels/TranslationModel");
 const AssistantAppointment = require("./assistantAppointmentModels/AssistantAppointmentModel");
 const Insurance = require("./insuranceModels/InsuranceModel");
 const MeetGreet = require("./meetGreetModels/MeetGreetModel");
+const DummyTicket = require("./dummyTicketModels/DummyTicketModel");
+const Courier = require("./courierModels/CourierModel");
+const Payment = require("./paymentModels/PaymentModel");
 const Document = require("./Document");
 const StatusHistory = require("./StatusHistory");
 
@@ -24,6 +27,7 @@ const SUBMISSION_MODELS = {
   assistant_appointment: AssistantAppointment,
   insurance: Insurance,
   meet_greet: MeetGreet,
+  dummy_ticket: DummyTicket,
 };
 
 function initModels() {
@@ -36,6 +40,8 @@ function initModels() {
   User.hasMany(AssistantAppointment, { foreignKey: "userId", as: "assistantAppointments" });
   User.hasMany(Insurance, { foreignKey: "userId", as: "insurances" });
   User.hasMany(MeetGreet, { foreignKey: "userId", as: "meetGreets" });
+  User.hasMany(DummyTicket, { foreignKey: "userId", as: "dummyTickets" });
+  User.hasMany(Payment, { foreignKey: "userId", as: "payments" });
 
   EVisa.belongsTo(User, { foreignKey: "userId", as: "user" });
   Hrd.belongsTo(User, { foreignKey: "userId", as: "user" });
@@ -46,6 +52,8 @@ function initModels() {
   AssistantAppointment.belongsTo(User, { foreignKey: "userId", as: "user" });
   Insurance.belongsTo(User, { foreignKey: "userId", as: "user" });
   MeetGreet.belongsTo(User, { foreignKey: "userId", as: "user" });
+  DummyTicket.belongsTo(User, { foreignKey: "userId", as: "user" });
+  Payment.belongsTo(User, { foreignKey: "userId", as: "user" });
 
   Object.entries(SUBMISSION_MODELS).forEach(([type, Model]) => {
     Model.hasMany(Document, {
@@ -77,6 +85,9 @@ module.exports = {
   AssistantAppointment,
   Insurance,
   MeetGreet,
+  DummyTicket,
+  Courier,
+  Payment,
   Document,
   StatusHistory,
   SUBMISSION_MODELS,

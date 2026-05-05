@@ -20,9 +20,8 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.22.3",
     "nodemailer": "^7.0.12",
-    "pg": "^8.13.1",
-    "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.5",
     "zod": "^4.2.1"
   },

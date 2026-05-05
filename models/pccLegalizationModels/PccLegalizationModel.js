@@ -24,9 +24,9 @@ const PccLegalization = sequelize.define(
     submittedAt: { type: DataTypes.DATE, allowNull: false },
     enquiryDate: { type: DataTypes.STRING(20), allowNull: true },
 
-    tracking: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+    tracking: { type: DataTypes.JSON, allowNull: false, defaultValue: {} },
     emails: {
-      type: DataTypes.JSONB,
+      type: DataTypes.JSON,
       allowNull: false,
       defaultValue: { userSent: false, adminSent: false, lastEmailAt: null },
     },

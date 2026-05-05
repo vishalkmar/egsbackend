@@ -4,11 +4,67 @@ const { requireUser } = require("../middleware/userAuth");
 const {
   EVisa, Hrd, MeaEnquiry, PccLegalization, StickerVisa, Translation,
   AssistantAppointment, Insurance, MeetGreet,
-  Document, StatusHistory, SUBMISSION_MODELS,
+  Document, StatusHistory, SUBMISSION_MODELS, User,
 } = require("../models");
 
 router.get("/user/me", requireUser, (req, res) => {
   return res.status(200).json({ success: true, user: req.user });
+});
+
+router.get("/user/profile", requireUser, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name || "",
+        phone: user.phone || "",
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
+      },
+    });
+  } catch (err) {
+    console.error("/user/profile error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+router.patch("/user/profile", requireUser, async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const phone = String(req.body?.phone || "").trim();
+
+    if (name.length < 2 || name.length > 100) {
+      return res.status(400).json({ success: false, message: "Name must be 2-100 characters" });
+    }
+    if (phone.length < 10 || phone.length > 15) {
+      return res.status(400).json({ success: false, message: "Phone must be 10-15 characters" });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    await user.update({ name, phone });
+
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name || "",
+        phone: user.phone || "",
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
+      },
+    });
+  } catch (err) {
+    console.error("PATCH /user/profile error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 // Aggregate dashboard for the logged-in user across ALL services.
