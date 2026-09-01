@@ -1,18 +1,24 @@
 const nodemailer = require("nodemailer");
 
+// Explicit SMTP config (more reliable on shared hosting than `service: "gmail"`).
+// Port 465 + secure:true tends to work even when 587 STARTTLS is filtered.
 const getTransporter = () => {
   return nodemailer.createTransport({
-    service: "gmail",
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: String(process.env.SMTP_SECURE || "true") === "true",
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
   });
 };
 
 const sendOtpEmail = async ({ to, otp }) => {
   const transporter = getTransporter();
-
   const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
 
   await transporter.sendMail({

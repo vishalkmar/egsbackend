@@ -29,10 +29,13 @@ const signToken = (payload) => {
   });
 };
 
+const isProd = process.env.NODE_ENV === "production";
+
 const cookieOptions = () => ({
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  // Cross-subdomain (services. <-> backend.) needs SameSite=None + Secure
+  secure: isProd,
+  sameSite: isProd ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 });
 
@@ -77,8 +80,8 @@ exports.adminLogout = async (req, res) => {
   try {
     res.clearCookie("admin_access_token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
     });
     return res.status(200).json({ success: true, message: "Logged out" });
   } catch (err) {

@@ -26,27 +26,24 @@ const sequelize = new Sequelize(
 );
 
 const connectDB = async () => {
-  try {
-    await sequelize.authenticate();
-    console.log(`${dialect.toUpperCase()} connected: ${process.env.DATABASE_HOST}:${process.env.DATABASE_PORT}/${process.env.DATABASE_NAME}`);
+  await sequelize.authenticate();
+  console.log(`${dialect.toUpperCase()} connected: ${process.env.DATABASE_HOST}:${process.env.DATABASE_PORT}/${process.env.DATABASE_NAME}`);
 
-    const { initModels } = require("../models");
-    initModels();
+  const { initModels } = require("../models");
+  initModels();
 
-    const syncMode = process.env.DB_SYNC || "alter";
-    if (syncMode === "force") {
-      await sequelize.sync({ force: true });
-      console.log("DB synced (FORCE: tables dropped & recreated)");
-    } else if (syncMode === "alter") {
-      await sequelize.sync({ alter: true });
-      console.log("DB synced (alter)");
-    } else {
-      await sequelize.sync();
-      console.log("DB synced (safe)");
-    }
-  } catch (err) {
-    console.error(`${dialect.toUpperCase()} connection error:`, err.message);
-    process.exit(1);
+  const syncMode = String(process.env.DB_SYNC || "false").toLowerCase();
+  if (syncMode === "force") {
+    await sequelize.sync({ force: true });
+    console.log("DB synced (FORCE: tables dropped & recreated)");
+  } else if (syncMode === "alter") {
+    await sequelize.sync({ alter: true });
+    console.log("DB synced (alter)");
+  } else if (syncMode === "true" || syncMode === "safe") {
+    await sequelize.sync();
+    console.log("DB synced (safe)");
+  } else {
+    console.log("DB sync skipped (DB_SYNC=false). Tables not modified.");
   }
 };
 
